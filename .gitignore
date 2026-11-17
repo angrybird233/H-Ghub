@@ -23,6 +23,7 @@ Thumbs.db
 *.jks
 *.p12
 *.pem
+.workbuddy/signing/
 .env
 .env.*
 

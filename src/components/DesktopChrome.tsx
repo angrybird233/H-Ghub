@@ -8,7 +8,24 @@ import {
   ISquare, ISun, ITrophy, IUser, IUserF, Logo,
 } from "../icons";
 
-const appWindow = () => getCurrentWindow();
+/** 纯浏览器（pnpm dev）没有 Tauri 注入对象，getCurrentWindow() 会同步抛错。
+ *  返回一个各方法均为 no-op 的桩，保证前端预览不白屏；真实桌面应用中走原生窗口。 */
+type Win = ReturnType<typeof getCurrentWindow>;
+const noopWindow = {
+  isMaximized: () => Promise.resolve(false),
+  isFullscreen: () => Promise.resolve(false),
+  onResized: () => Promise.resolve(() => {}),
+  toggleMaximize: () => Promise.resolve(),
+  minimize: () => Promise.resolve(),
+  close: () => Promise.resolve(),
+} as unknown as Win;
+const appWindow = (): Win => {
+  try {
+    return getCurrentWindow();
+  } catch {
+    return noopWindow;
+  }
+};
 
 export function DesktopTitleBar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { theme, setTheme, setTab, platform } = useStore();
