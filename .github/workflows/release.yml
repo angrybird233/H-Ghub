@@ -80,7 +80,7 @@ jobs:
 
   # ================= Android：按 ABI 分包 + 签名 =================
   android:
-    name: Android (split per ABI)
+    name: "Android (64-bit: arm64 + x86_64)"
     if: github.event_name == 'push' || github.event.inputs.targets == '' || github.event.inputs.targets == 'all' || contains(github.event.inputs.targets, 'android')
     runs-on: ubuntu-latest
     steps:
@@ -125,7 +125,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android,x86_64-linux-android
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -136,8 +136,8 @@ jobs:
       - name: 生成 Android 工程
         run: pnpm tauri android init --ci
 
-      - name: 编译 APK（按 ABI 分包）
-        run: pnpm tauri android build --apk --split-per-abi --target aarch64 armv7 x86_64
+      - name: 编译 APK（仅 64 位：arm64 + x86_64）
+        run: pnpm tauri android build --apk --split-per-abi --target aarch64 x86_64
 
       - name: 签名 APK（有密钥用正式签名，否则用 debug 签名）
         env:
