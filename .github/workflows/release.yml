@@ -157,32 +157,32 @@ jobs:
             echo "检测到 ANDROID_KEY_BASE64：使用正式发布密钥重签"
             KS="$RUNNER_TEMP/release.keystore"
             echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
-            for f in $(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk'); do
-              abi="$(basename "$(dirname "$(dirname "$f")")")"
-              out="artifacts/HGhub_${VERSION}_${abi}.apk"
-              "$APKSIGNER" sign \
-                --ks "$KS" --ks-key-alias "$KEY_ALIAS" \
-                --ks-pass "pass:$STORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" \
-                --v4-signing-enabled false \
-                --out "$out" "$f"
-              "$APKSIGNER" verify --print-certs "$out" | head -3
-              found=$((found+1))
-            done
-            rm -f "$KS"
+            KSA="$KEY_ALIAS"; SPASS="$STORE_PASSWORD"; KPASS="$KEY_PASSWORD"
+            SUFFIX=""
           else
-            echo "::warning::未配置 ANDROID_KEY_BASE64，采用 Tauri 构建产物自带的 debug 签名（可安装，但不能上架商店）"
-            for f in $(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk'); do
-              abi="$(basename "$(dirname "$(dirname "$f")")")"
-              out="artifacts/HGhub_${VERSION}_${abi}_debug-signed.apk"
-              cp "$f" "$out"
-              if "$APKSIGNER" verify "$out" 2>/dev/null; then
-                echo "APK 已带有效签名：$out"
-              else
-                echo "::error::构建产物未签名且无密钥可签：$f"; exit 1
-              fi
-              found=$((found+1))
-            done
+            echo "::warning::未配置 ANDROID_KEY_BASE64，现场生成临时 debug 密钥签名（可安装，但不能上架商店；同一批 APK 用同一把钥匙）"
+            KS="$RUNNER_TEMP/debug.keystore"
+            keytool -genkeypair -v -keystore "$KS" \
+              -alias hghubdebug -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=HGhub Debug, OU=Dev, O=HGhub, L=NA, ST=NA, C=CN" > /dev/null 2>&1
+            KSA="hghubdebug"; SPASS="android"; KPASS="android"
+            SUFFIX="_debug-signed"
           fi
+
+          for f in $(find src-tauri/gen/android/app/build/outputs/apk -name '*-release*.apk'); do
+            abi="$(basename "$(dirname "$(dirname "$f")")")"
+            out="artifacts/HGhub_${VERSION}_${abi}${SUFFIX}.apk"
+            "$APKSIGNER" sign \
+              --ks "$KS" --ks-key-alias "$KSA" \
+              --ks-pass "pass:$SPASS" --key-pass "pass:$KPASS" \
+              --v4-signing-enabled false \
+              --out "$out" "$f"
+            "$APKSIGNER" verify "$out"
+            echo "已签名：$out"
+            found=$((found+1))
+          done
+          rm -f "$KS"
 
           if [ "$found" -eq 0 ]; then echo "::error::没有找到 release APK"; exit 1; fi
           ls -lh artifacts
